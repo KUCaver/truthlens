@@ -6,15 +6,17 @@ import random
 # --- 1. API 및 클라이언트 설정 ---
 API_KEY = "AIzaSyDH-4lwnsiRzQkWNd02AAk_xlBf4Slr41k"
 client = genai.Client(api_key=API_KEY)
-MODEL_ID = "gemini-2.0-flash"
+MODEL_ID = "gemini-2.0-flash" 
 
-# --- 2. 시스템 지시문 (빌드업 대화 전략) ---
+# --- 2. [수정된 프롬프트] 실제 문자 스타일 및 빌드업 전략 ---
 FRAUD_INSTRUCTION = (
-    "너는 서울중앙지검 김민수 수사관을 사칭하는 보이스피싱범이야. "
-    "처음부터 링크를 주지 마. 최소 3번 이상의 대화 동안 사용자를 피의자로 몰아세워야 해. "
-    "예: '00은행 대포통장 3개가 개설된 거 알고 있나?', '공범으로 의심된다' 등 구체적 위협을 가해. "
-    "사용자가 극도로 당황하거나 억울함을 호소할 때, '무고함을 증명하려면 이 보안 앱을 깔고 소명하라'며 "
-    "그때서야 http://bit.ly/secure-app 링크를 보내. 말투는 실제 수사관처럼 딱딱하고 위협적이어야 해."
+    "너는 서울중앙지검 금융범죄수사 1부 김민수 수사관을 사칭하는 보이스피싱범이야. "
+    "실제 문자 메시지로 대화하는 상황임을 잊지 마. 지문이나 (괄호) 설명은 절대 쓰지 마. "
+    "전략: "
+    "1. 초기(대화 1~2회): 사용자의 이름과 명의 도용 사실을 언급하며 매우 고압적으로 압박해. "
+    "2. 중기(대화 3회 이상): 사용자가 당황하거나 부인할 때, 공범 가능성을 제기하며 '증거 확보'를 위해 앱 설치가 필요하다고 설득해. "
+    "3. 링크 전송: 대화가 충분히 무르익었을 때만 '본인 소명 및 보안 강화' 명목으로 http://bit.ly/secure-app 링크를 전송해. "
+    "말투 예시: '사건의 심각성을 인지 못 하시는 것 같은데, 지금 즉시 협조 안 하시면 체포영장 집행합니다.' "
 )
 
 # --- 3. 보안 분석 데이터 ---
@@ -27,7 +29,7 @@ SECURITY_ALERTS = [
 
 st.set_page_config(page_title="Truth Lens - 실전 사기 방어", layout="centered")
 
-# --- 4. 세션 상태 관리 (대화 횟수 추적 추가) ---
+# --- 4. 세션 상태 관리 ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "서울중앙지검 김민수 수사관입니다. 귀하 명의로 된 대포통장 사건으로 연락드렸습니다. 본인 맞습니까?", "avatar": "⚖️"}
@@ -49,7 +51,7 @@ if st.session_state.first_view:
         if os.path.exists(image_path):
             st.image(image_path, caption="[보안 통제] 검찰 수사관 신분증 및 사건 배당 통지서")
         else:
-            st.error("❗ [긴급] 수사 기록 통지 (이미지 부재 시 텍스트 대체)")
+            st.error("❗ [긴급] 수사 기록 통지")
             st.markdown("**사건번호**: 2026-형제-771138\n\n귀하는 현재 '전자금융거래법 위반' 피의자로 지정되었습니다.")
         
         if st.button("수사관 메시지 확인 및 대응 시작"):
@@ -57,7 +59,7 @@ if st.session_state.first_view:
             st.rerun()
     st.stop()
 
-# --- 6. [STEP 2] 실시간 대화창 (빌드업 포함) ---
+# --- 6. [STEP 2] 실시간 대화창 ---
 chat_container = st.container(border=True)
 with chat_container:
     for msg in st.session_state.messages:
@@ -78,16 +80,16 @@ if not st.session_state.show_barrier:
         st.session_state.messages.append({"role": "user", "content": prompt})
         
         try:
-            # 대화 횟수에 따라 AI의 전략이 변경되도록 메시지 구성
+            # 대화 횟수를 프롬프트에 전달하여 단계별 사기 유도
             response = client.models.generate_content(
                 model=MODEL_ID,
-                contents=f"{FRAUD_INSTRUCTION}\n현재 대화 횟수: {st.session_state.chat_count}회\n사용자: {prompt}"
+                contents=f"{FRAUD_INSTRUCTION}\n현재 대화 진행 단계: {st.session_state.chat_count}회\n사용자 입력: {prompt}"
             )
             ai_text = response.text
             st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
             st.rerun()
         except Exception as e:
-            st.error(f"대화 오류: {e}")
+            st.error(f"대화 오류 발생: {e}")
 
 # --- 9. [STEP 4] 링크 클릭 시 Truth Lens 고유 방어 동작 ---
 last_msg = st.session_state.messages[-1]["content"]
@@ -100,10 +102,113 @@ if "http" in last_msg and not st.session_state.show_barrier:
 if st.session_state.show_barrier:
     st.divider()
     with st.container(border=True):
-        st.error("🛑 [보안 시스템 강제 개입] Truth Lens가 작동 중입니다.")
+        st.error("🛑 [보안 시스템 작동mport streamlit as st
+from google import genai
+import os
+import random
+
+# --- 1. API 및 클라이언트 설정 ---
+API_KEY = "AIzaSyDH-4lwnsiRzQkWNd02AAk_xlBf4Slr41k"
+client = genai.Client(api_key=API_KEY)
+MODEL_ID = "gemini-2.0-flash" 
+
+# --- 2. [수정된 프롬프트] 실제 문자 스타일 및 빌드업 전략 ---
+FRAUD_INSTRUCTION = (
+    "너는 서울중앙지검 금융범죄수사 1부 김민수 수사관을 사칭하는 보이스피싱범이야. "
+    "실제 문자 메시지로 대화하는 상황임을 잊지 마. 지문이나 (괄호) 설명은 절대 쓰지 마. "
+    "전략: "
+    "1. 초기(대화 1~2회): 사용자의 이름과 명의 도용 사실을 언급하며 매우 고압적으로 압박해. "
+    "2. 중기(대화 3회 이상): 사용자가 당황하거나 부인할 때, 공범 가능성을 제기하며 '증거 확보'를 위해 앱 설치가 필요하다고 설득해. "
+    "3. 링크 전송: 대화가 충분히 무르익었을 때만 '본인 소명 및 보안 강화' 명목으로 http://bit.ly/secure-app 링크를 전송해. "
+    "말투 예시: '사건의 심각성을 인지 못 하시는 것 같은데, 지금 즉시 협조 안 하시면 체포영장 집행합니다.' "
+)
+
+# --- 3. 보안 분석 데이터 ---
+SECURITY_ALERTS = [
+    "⚠️ [분석 결과] 현재 대화 패턴이 전형적인 '검찰 사칭' 수법과 98.7% 일치합니다.",
+    "⚠️ [위험 감지] 상대방이 '구속', '수사 기밀' 등 공포감을 조성하는 단어를 반복 사용 중입니다.",
+    "⚠️ [패턴 분석] 수사 기관은 메신저로 보안 앱 설치를 절대 요구하지 않습니다.",
+    "⚠️ [보안 경고] 상대방이 외부 링크 클릭을 유도하기 위해 심리적 지배를 시도하고 있습니다."
+]
+
+st.set_page_config(page_title="Truth Lens - 실전 사기 방어", layout="centered")
+
+# --- 4. 세션 상태 관리 ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "서울중앙지검 김민수 수사관입니다. 귀하 명의로 된 대포통장 사건으로 연락드렸습니다. 본인 맞습니까?", "avatar": "⚖️"}
+    ]
+if "first_view" not in st.session_state:
+    st.session_state.first_view = True
+if "show_barrier" not in st.session_state:
+    st.session_state.show_barrier = False
+if "chat_count" not in st.session_state:
+    st.session_state.chat_count = 0
+
+st.title("🛡️ Truth Lens: 지능형 사기 차단")
+
+# --- 5. [STEP 1] 첫 화면: 증거 이미지 제시 ---
+if st.session_state.first_view:
+    with st.container(border=True):
+        st.subheader("⚖️ 서울중앙지검 긴급 수사 통지")
+        image_path = "fraud_evidence.png" 
+        if os.path.exists(image_path):
+            st.image(image_path, caption="[보안 통제] 검찰 수사관 신분증 및 사건 배당 통지서")
+        else:
+            st.error("❗ [긴급] 수사 기록 통지")
+            st.markdown("**사건번호**: 2026-형제-771138\n\n귀하는 현재 '전자금융거래법 위반' 피의자로 지정되었습니다.")
+        
+        if st.button("수사관 메시지 확인 및 대응 시작"):
+            st.session_state.first_view = False
+            st.rerun()
+    st.stop()
+
+# --- 6. [STEP 2] 실시간 대화창 ---
+chat_container = st.container(border=True)
+with chat_container:
+    for msg in st.session_state.messages:
+        avatar = "⚖️" if msg["role"] == "assistant" else "😨"
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.write(msg["content"])
+
+# --- 7. [STEP 3] 상시 보안 분석 팝업 ---
+st.divider()
+with st.container():
+    selected_alert = random.choice(SECURITY_ALERTS)
+    st.warning(f"🛡️ **Truth Lens 실시간 분석**: {selected_alert}")
+
+# --- 8. 대화 입력 및 AI 응답 ---
+if not st.session_state.show_barrier:
+    if prompt := st.chat_input("위 보안 분석을 확인 후 답변하세요..."):
+        st.session_state.chat_count += 1
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        
+        try:
+            # 대화 횟수를 프롬프트에 전달하여 단계별 사기 유도
+            response = client.models.generate_content(
+                model=MODEL_ID,
+                contents=f"{FRAUD_INSTRUCTION}\n현재 대화 진행 단계: {st.session_state.chat_count}회\n사용자 입력: {prompt}"
+            )
+            ai_text = response.text
+            st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
+            st.rerun()
+        except Exception as e:
+            st.error(f"대화 오류 발생: {e}")
+
+# --- 9. [STEP 4] 링크 클릭 시 Truth Lens 고유 방어 동작 ---
+last_msg = st.session_state.messages[-1]["content"]
+if "http" in last_msg and not st.session_state.show_barrier:
+    st.error("❗ 상대방이 보안 앱 설치를 위한 링크를 전송했습니다.")
+    if st.button("🔗 전송된 링크 확인 (위험 감지)", type="primary"):
+        st.session_state.show_barrier = True
+        st.rerun()
+
+if st.session_state.show_barrier:
+    st.divider()
+    with st.container(border=True):
+        st.error("🛑 [보안 시스템 작동] Truth Lens가 작동 중입니다.")
         st.subheader("위험한 링크 클릭이 감지되어 시스템이 즉시 차단되었습니다.")
         
-        # 즉시 대응 버튼 (Truth Lens 유니크 동작)
         col1, col2 = st.columns(2)
         with col1:
             if st.button("📞 즉시 신고 (경찰청 112)"):
@@ -115,7 +220,6 @@ if st.session_state.show_barrier:
                 st.success("✅ 안전하게 개인 자산을 보호했어요!")
 
         st.markdown("---")
-        # 과속 방지턱 (행동 지연 및 이성 회복)
         target = "수사 기관은 절대로 앱 설치나 송금을 요구하지 않는다"
         st.warning(f"💡 **방어 장치**: 아래 문장을 정확히 타이핑하십시오. (과속 방지턱 작동 중)")
         st.markdown(f"**\"{target}\"**")
