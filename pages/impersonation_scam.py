@@ -4,129 +4,151 @@ import os
 import random
 
 # --- 1. API 및 클라이언트 설정 ---
+# 사용자님의 최신 키 반영
 API_KEY = "AIzaSyDH-4lwnsiRzQkWNd02AAk_xlBf4Slr41k"
 client = genai.Client(api_key=API_KEY)
 MODEL_ID = "gemini-2.0-flash" 
 
-# --- 2. 스마트폰 내부 렌더링을 위한 다크 스타일 ---
-st.set_page_config(page_title="Truth Lens", layout="centered")
+# --- 2. 시스템 지시문 (자연스러운 문자 대화 페르소나) ---
+FRAUD_INSTRUCTION = (
+    "너는 서울중앙지검 김민수 수사관을 사칭하는 보이스피싱범이야. "
+    "실제 문자를 보내는 것처럼 딱딱하고 위협적으로 말해. 지문이나 (괄호) 설명은 절대 쓰지 마. "
+    "혐의를 나열하며 압박하다가 결국 보안 앱 링크(http://bit.ly/secure-app)를 전송해."
+)
 
-st.markdown("""
-<style>
-    .stApp { background-color: #0e1117; }
-    
-    /* 스마트폰 프레임 고정 */
-    .phone-frame {
-        border: 10px solid #2d2d2d;
-        border-radius: 40px;
-        width: 360px;
-        height: 720px;
-        margin: auto;
-        background-color: #161b22;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        position: relative;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-    }
-
-    /* 상단 노치 영역 */
-    .phone-notch {
-        width: 120px;
-        height: 20px;
-        background: #2d2d2d;
-        border-bottom-left-radius: 15px;
-        border-bottom-right-radius: 15px;
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 100;
-    }
-
-    /* 내부 콘텐츠 스크롤 영역 */
-    .phone-content {
-        padding: 40px 20px 20px 20px;
-        height: 100%;
-        overflow-y: auto;
-        scrollbar-width: none; /* 파이어폭스 */
-    }
-    .phone-content::-webkit-scrollbar { display: none; } /* 크롬/사파리 */
-
-    /* 대화창 다크 스타일링 */
-    [data-testid="stChatMessage"] {
-        background-color: #21262d !important;
-        border: 1px solid #30363d;
-        margin-bottom: 10px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- 3. 시스템 설정 ---
-FRAUD_INSTRUCTION = "너는 보이스피싱범 김민수 수사관이야. 고압적인 문자 스타일로 앱 설치 링크(http://bit.ly/secure-app)를 보내."
+# --- 3. 보안 분석 데이터 (입력 전 팝업용) ---
 SECURITY_ALERTS = [
-    "🛡️ Truth Lens: 사기 패턴 98.7% 일치",
-    "🛡️ Truth Lens: 수사기관은 문자로 링크 안 보냄",
-    "🛡️ Truth Lens: 심리적 압박 수법 감지됨"
+    "⚠️ [분석 결과] 현재 대화 패턴이 전형적인 '검찰 사칭' 수법과 98.7% 일치합니다.",
+    "⚠️ [위험 감지] 상대방이 '구속', '수사 기밀' 등 공포감을 조성하는 단어를 반복 사용 중입니다.",
+    "⚠️ [패턴 분석] 수사 기관은 메신저로 보안 앱 설치를 절대 요구하지 않습니다. 사기일 확률이 매우 높습니다.",
+    "⚠️ [보안 경고] 상대방이 외부 링크 클릭을 유도하기 위해 심리적 지배를 시도하고 있습니다.",
+    "⚠️ [데이터 매칭] 현재 유도하는 앱 설치 수법은 최근 보고된 '스미싱' 피해 사례와 동일합니다."
 ]
 
+st.set_page_config(page_title="Truth Lens - 실시간 자산 보호", layout="centered")
+
+# --- 4. 세션 상태 관리 ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "서울중앙지검 김민수 수사관입니다. 본인 맞습니까?", "avatar": "⚖️"}]
+    st.session_state.messages = [
+        {"role": "assistant", "content": "서울중앙지검 김민수 수사관입니다. 귀하의 명의가 대규모 금융 범죄에 연루되었습니다.", "avatar": "⚖️"}
+    ]
 if "first_view" not in st.session_state:
     st.session_state.first_view = True
 if "show_barrier" not in st.session_state:
     st.session_state.show_barrier = False
 
-# --- 4. 폰 프레임 내부 구성 ---
-# HTML 태그를 사용하여 프레임을 열어줍니다.
-st.markdown('<div class="phone-frame"><div class="phone-notch"></div><div class="phone-content">', unsafe_allow_html=True)
-
-# 폰 내부 콘텐츠 (Step 1 ~ Step 4)
+# --- 5. [STEP 1] 첫 화면: 이미지 또는 TXT 공고문 ---
 if st.session_state.first_view:
-    st.subheader("⚖️ 긴급 통지")
-    if os.path.exists("fraud_evidence.png"):
-        st.image("fraud_evidence.png")
-    else:
-        st.error("❗ [긴급] 전자 기록물 통지")
-        st.caption("귀하는 금융범죄 피의자로 지정되었습니다.")
-    if st.button("메시지 확인"):
-        st.session_state.first_view = False
-        st.rerun()
-else:
-    # 채팅 내역
+    with st.container(border=True):
+        st.subheader("⚖️ 서울중앙지검 금융범죄수사과")
+        image_path = "fraud_evidence.png" # 사용자님이 지정한 이미지 이름
+        
+        if os.path.exists(image_path):
+            st.image(image_path, caption="[보안 통제] 검찰 수사관 공무원증 및 사건 배당 통지서")
+        else:
+            st.error("❗ [긴급] 전자 기록물 열람 안내 (이미지 부재 시 텍스트 대체)")
+            st.markdown(f"""
+            **사건번호**: 2026-형제-771138  
+            **담당자**: 김민수 수사관  
+            
+            귀하는 현재 금융 범죄 피의자로 지정되었습니다. 본 통지서는 법적 효력을 갖는 수사 개시 알림입니다.
+            이미지 파일({image_path})을 불러올 수 없어 텍스트로 긴급 전송되었습니다.
+            """)
+        
+        if st.button("수사관 메시지 확인 및 대응 시작"):
+            st.session_state.first_view = False
+            st.rerun()
+    st.stop()
+
+st.title("🛡️ Truth Lens: 지능형 사기 차단")
+
+# --- 6. [STEP 2] 실시간 대화창 ---
+chat_container = st.container(border=True)
+with chat_container:
     for msg in st.session_state.messages:
-        with st.chat_message(msg["role"], avatar=msg.get("avatar", "😨")):
+        avatar = "⚖️" if msg["role"] == "assistant" else "😨"
+        with st.chat_message(msg["role"], avatar=avatar):
             st.write(msg["content"])
 
-    # 상시 보안 팝업
-    st.warning(random.choice(SECURITY_ALERTS))
+# --- 7. [STEP 3] 상시 보안 분석 팝업 (과속 방지턱) ---
+# 사용자가 대답을 입력하려 할 때마다 항상 상단에 경고 분석 결과를 노출합니다.
+st.divider()
+with st.container():
+    selected_alert = random.choice(SECURITY_ALERTS)
+    st.warning(f"🛡️ **Truth Lens 실시간 분석**: {selected_alert}")
+    st.caption("※ 이 분석 결과는 과거의 사기 패턴과 실시간 대화 흐름을 AI가 매칭한 결과입니다.")
 
-    # 입력창 (폰 내부에서 처리하기 위해 st.chat_input 대신 폰 전용 입력 방식 사용 시도)
-    if not st.session_state.show_barrier:
-        # 폰 내부 느낌을 위해 st.text_input 사용 (chat_input은 폰 밖에 생길 확률이 큼)
-        user_reply = st.text_input("답장 입력...", key="chat_input_phone")
-        if st.button("전송"):
-            st.session_state.messages.append({"role": "user", "content": user_reply})
-            response = client.models.generate_content(model=MODEL_ID, contents=f"{FRAUD_INSTRUCTION}\n\n사용자: {user_reply}")
-            st.session_state.messages.append({"role": "assistant", "content": response.text, "avatar": "⚖️"})
+# --- 8. 대화 입력 및 링크 클릭 감지 로직 ---
+if not st.session_state.show_barrier:
+    if prompt := st.chat_input("위 보안 분석을 확인 후 답변하세요..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        try:
+            response = client.models.generate_content(
+                model=MODEL_ID,
+                contents=f"{FRAUD_INSTRUCTION}\n\n사용자: {prompt}"
+            )
+            ai_text = response.text
+            st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
             st.rerun()
+        except Exception as e:
+            st.error(f"대화 오류: {e}")
 
-    # 링크 감지 및 방지턱
-    last_msg = st.session_state.messages[-1]["content"]
-    if "http" in last_msg and not st.session_state.show_barrier:
-        if st.button("🔗 보안 링크 확인 (클릭)", type="primary"):
-            st.session_state.show_barrier = True
-            st.rerun()
+# 마지막 메시지에 링크가 포함된 경우 '과속 방지턱' 발동 준비
+last_msg = st.session_state.messages[-1]["content"]
+if "http" in last_msg and not st.session_state.show_barrier:
+    st.error("❗ 상대방이 보낸 링크는 악성 앱 설치 유도용 피싱 URL입니다.")
+    if st.button("🔗 보안 링크 클릭 시도 (위험)", type="primary"):
+        st.session_state.show_barrier = True
+        st.rerun()
 
-    if st.session_state.show_barrier:
-        st.error("🛑 Truth Lens 차단")
-        st.button("📞 1301 즉시 신고")
+# --- 9. [STEP 4] Truth Lens만의 유니크한 방어 동작 (팝업 형태) ---
+# --- 9. [STEP 4] Truth Lens만의 유니크한 방어 동작 (최종 경고 강화) ---
+if st.session_state.show_barrier:
+    st.divider()
+    with st.container(border=True):
+        st.error("🛑 [보안 시스템 강제 개입] Truth Lens가 작동 중입니다.")
+        st.subheader("위험한 링크 클릭이 감지되어 시스템이 즉시 차단되었습니다.")
+        
+        # 즉시 대응 버튼
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📞 즉시 신고 (경찰청 1301)"):
+                st.success("✅ 안전하게 개인 자산을 보호했어요! 사기로부터 방어 완료!!")
+                st.info("이것이 바로 Truth Lens만의 특별하고 독보적인 보안 동작입니다.")
+                st.balloons()
+        with col2:
+            if st.button("📞 가족/지인에게 도움 요청"):
+                st.success("✅ 안전하게 개인 자산을 보호했어요! 사기로부터 방어 완료!!")
+
+        st.markdown("---")
+        
+        # 과속 방지턱: 행동 시간을 늘려 이성 회복 유도
         target = "수사 기관은 절대로 앱 설치나 송금을 요구하지 않는다"
-        st.info(f"**과속 방지턱: 아래 문장 입력**\n\n{target}")
-        user_input = st.text_input("타이핑 하세요:", key="barrier")
+        st.warning(f"💡 **방어 장치**: 아래 문장을 정확히 타이핑하십시오. (과속 방지턱 작동 중)")
+        st.markdown(f"**\"{target}\"**")
+        
+        user_input = st.text_input("직접 타이핑하여 위험을 인지하세요:", key="barrier_input")
+        
+        # 문장 입력이 일치했을 때의 로직 수정
         if user_input.strip() == target:
-            st.error("❗ 최종 경고: 자산 탈취 위험!")
-            st.link_button("⚠️ 위험 무시하고 이동", "https://www.polico.go.kr/index.do")
-
-# 프레임을 닫아줍니다.
-st.markdown('</div></div>', unsafe_allow_html=True)
+            # 안심시키는 문구 대신 강력한 최종 경고 배치
+            st.error("❗ [최종 경고] 문장을 입력하셨으나, 위험은 사라지지 않았습니다.")
+            st.markdown("""
+            **방금 입력하신 내용을 다시 한번 되새기십시오.** 당신이 지금 누르려는 링크는 당신의 모든 연락처, 사진, 금융 정보를 탈취하기 위한 도구입니다.  
+            **정말로 이 위험을 감수하고 계속 진행하시겠습니까?**
+            """)
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                # 안전 우회 링크
+                st.link_button("⚠️ 위험 무시하고 이동 (권장하지 않음)", "https://www.polico.go.kr/index.do", type="primary")
+            with col_b:
+                if st.button("🚫 차단 완료 및 대화 종료"):
+                    st.success("✅ 안전하게 개인 자산을 보호했어요! 사기로부터 방어 완료!!")
+                    st.info("이것이 바로 Truth Lens만의 특별하고 독보적인 보안 동작입니다.")
+                    st.balloons()
+                    if st.button("새로운 탐지 시작"):
+                        st.session_state.clear()
+                        st.rerun()
+        elif user_input:
+            st.error("⚠️ 문장이 일치하지 않습니다. 당황하지 말고 천천히 다시 입력하며 상황을 직시하세요.")
