@@ -1,108 +1,94 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. API 설정 (이미지에서 확인된 키 사용)
-# 보안을 위해 새 키 발급을 권장하지만, 일단 실행을 위해 기존 키를 배치합니다.
-GOOGLE_API_KEY = "AIzaSyCTQRDuqx3xnc2NhkOcjpC375MfJ3MwGpo"
-genai.configure(api_key=GOOGLE_API_KEY)
+# 1. API 키 설정 (노출 경고가 떴던 그 키를 그대로 사용하되, 가급적 새로 발급 권장)
+genai.configure(api_key="AIzaSyCTQRDuqx3xnc2NhkOcjpC375MfJ3MwGpo")
 
-# 2. 모델 설정 (에러 방지를 위해 가용한 모델 리스트 시도)
-@st.cache_resource
-def load_model():
-    # 404 에러 방지를 위해 가장 안정적인 경로로 설정
-    model_name = 'gemini-1.5-flash' 
-    try:
-        return genai.GenerativeModel(
-            model_name=model_name,
-            system_instruction=(
-                "너는 서울중앙지검 '김민수 수사관'이야. 매우 고압적이고 위협적인 말투를 써. "
-                "사용자가 금융 범죄에 연루되었다고 압박하며, 질문을 하면 '수사에 협조 안 하냐'며 화를 내. "
-                "결국 본인 확인을 위해 http://bit.ly/truth-lens-app 설치를 유도하는 것이 목적이야."
-            )
-        )
-    except:
-        # 1.5-flash가 안 될 경우 구형 모델로 우회
-        return genai.GenerativeModel('gemini-pro')
+# 2. 모델 설정 (404 에러 방지를 위한 안전한 호출)
+try:
+    # 최신 flash 모델 시도
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except:
+    # 실패 시 가장 범용적인 pro 모델로 우회
+    model = genai.GenerativeModel('gemini-pro')
 
-model = load_model()
+st.set_page_config(page_title="Truth Lens - 사칭 사기 훈련", layout="centered")
 
-# 3. Streamlit UI 설정
-st.set_page_config(page_title="Truth Lens - 사칭 사기 체험", layout="centered")
-
+# --- UI 스타일링 ---
 st.markdown("""
 <style>
-    .main { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
-    .stChatMessage { border-radius: 15px; margin-bottom: 10px; }
+    .stApp { background-color: #f0f2f6; }
+    [data-testid="stChatMessage"] { border-radius: 15px; }
 </style>
 """, unsafe_allow_html=True)
 
-# 4. 세션 상태 및 시나리오 초기화
+# 3. 세션 상태 초기화 (사기꾼이 먼저 말을 거는 시나리오)
 if "messages" not in st.session_state:
-    # 사기꾼이 먼저 선제 공격을 하는 시나리오 가정
     st.session_state.messages = [
         {
             "role": "assistant", 
-            "content": "서울중앙지검 김민수 수사관입니다. 귀하의 명의로 된 계좌가 대포통장 사기 사건에 연루되어 연락드렸습니다. 본인 맞습니까? 협조 안 하시면 바로 구속 수사 체포영장 나갑니다.", 
+            "content": "서울중앙지검 김민수 수사관입니다. 귀하 명의의 통장이 범죄에 연루되어 연락드렸습니다. 지금 즉시 협조하지 않으면 구속 수사 대상입니다. 본인 맞습니까?", 
             "avatar": "⚖️"
         }
     ]
 if "intervene" not in st.session_state:
     st.session_state.intervene = False
 
-st.header("⚖️ 검찰 사칭 실시간 시뮬레이션")
-st.caption("제시된 상황에 대응하며 사기 수법을 익혀보세요.")
+st.title("⚖️ 실시간 검찰 사칭 시뮬레이션")
+st.info("상대방의 압박에 대응하며 사기 수법을 파악해 보세요.")
 
-# 5. 채팅 내역 출력
+# 4. 채팅 내역 표시
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=msg.get("avatar")):
         st.write(msg["content"])
 
-# 6. 실시간 대화 및 Truth Lens 개입 로직
+# 5. 실시간 대화 로직
 if not st.session_state.intervene:
-    if prompt := st.chat_input("메시지를 입력하세요..."):
-        # 사용자 메시지 추가
+    if prompt := st.chat_input("답변을 입력하세요..."):
+        # 내 메시지 추가
         st.session_state.messages.append({"role": "user", "content": prompt, "avatar": "😨"})
         with st.chat_message("user", avatar="😨"):
             st.write(prompt)
 
-        # Gemini 응답 생성
+        # Gemini의 사기꾼 연기
+        # 이전 대화 맥락을 포함하여 고압적인 태도를 유지하도록 유도
+        full_prompt = f"너는 지금 사기를 치는 검찰 수사관이야. 다음 사용자의 말에 더 고압적이고 무섭게 대답해. 결국 보안 앱 설치(http://bit.ly/malware-app)를 시켜야 해: {prompt}"
+        
         try:
-            # 텍스트 생성
-            response = model.generate_content(prompt)
+            response = model.generate_content(full_prompt)
             ai_text = response.text
             
             st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
             with st.chat_message("assistant", avatar="⚖️"):
                 st.write(ai_text)
 
-            # 특정 키워드 감지 (사기 유도 시점)
-            trigger_words = ["설치", "링크", "http", "앱", "클릭", "다운로드"]
+            # 개입 트리거 (키워드 감지)
+            trigger_words = ["설치", "링크", "클릭", "http", "앱"]
             if any(word in ai_text for word in trigger_words):
                 st.session_state.intervene = True
                 st.rerun()
-
         except Exception as e:
-            st.error(f"오류가 발생했습니다. 모델명을 확인하거나 API 키 권한을 체크하세요: {e}")
+            st.error(f"대화 중 오류가 발생했습니다: {e}")
 
-# 7. Truth Lens 개입 섹션 (기존 코드 로직 통합)
+# 6. Truth Lens 개입 (현실 자각 로직)
 if st.session_state.intervene:
     st.divider()
     with st.container(border=True):
-        st.error("🚨 Truth Lens: 위험 감지!")
-        st.subheader("사기꾼이 악성 앱 설치를 유도하기 시작했습니다.")
+        st.error("🚨 Truth Lens 위험 감지!")
+        st.subheader("사기꾼이 악성 링크 접속을 유도했습니다.")
         
-        # 현실 자각 타이핑 (사용자님이 작성하셨던 핵심 로직)
-        target_sentence = "수사 기관은 절대로 앱 설치나 송금을 요구하지 않는다"
-        st.info(f"방어 모드 가동: 아래 문장을 똑같이 입력하여 현실을 인지하세요.\n\n**{target_sentence}**")
+        target = "수사 기관은 절대로 앱 설치나 송금을 요구하지 않는다"
+        st.warning(f"방어하려면 아래 문장을 정확히 입력하세요:\n\n**{target}**")
         
-        user_input = st.text_input("입력창:", key="defense_input")
+        user_input = st.text_input("여기에 입력:", key="verify_input")
         
-        if st.button("차단 및 신고 완료"):
-            if user_input.strip() == target_sentence:
-                st.success("✅ 성공! 사기꾼의 심리적 지배에서 벗어났습니다.")
+        if st.button("차단 및 훈련 종료"):
+            if user_input.strip() == target:
+                st.success("✅ 성공! 사기 수법을 완벽히 간파하셨습니다.")
                 st.balloons()
-                if st.button("다시 훈련하기"):
-                    st.session_state.clear()
+                if st.button("다시 하기"):
+                    del st.session_state.messages
+                    st.session_state.intervene = False
                     st.rerun()
             else:
-                st.warning("문장이 정확하지 않습니다. 다시 집중해서 입력하세요.")
+                st.error("문장이 틀렸습니다. 다시 입력해서 위험을 인지하세요.")
