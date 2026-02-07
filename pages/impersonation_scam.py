@@ -4,7 +4,7 @@ import os
 
 # 1. 환경 변수에서 API 키 불러오기
 # 터미널에서 export GOOGLE_API_KEY="..." 또는 setx GOOGLE_API_KEY "..."를 하셨어야 합니다.
-api_key = os.getenv("GOOGLE_API_KEY")
+api_key = os.getenv(AIzaSyCTQRDuqx3xnc2NhkOcjpC375MfJ3MwGpo)
 
 if not api_key:
     st.error("⚠️ 환경 변수 'GOOGLE_API_KEY'를 찾을 수 없습니다. 설정 후 다시 실행해주세요.")
