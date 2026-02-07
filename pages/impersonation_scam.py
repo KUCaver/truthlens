@@ -101,11 +101,11 @@ if "http" in last_msg and not st.session_state.show_barrier:
         st.session_state.show_barrier = True
         st.rerun()
 
-# --- 9. [STEP 4] Truth Lens만의 유니크한 방어 동작 (팝업 형태) ---
+# --- 9. [STEP 4] Truth Lens만의 유니크한 방어 동작 (최종 경고 강화) ---
 if st.session_state.show_barrier:
     st.divider()
     with st.container(border=True):
-        st.error("🛑 [실제상황] Truth Lens 보안 시스템 강제 개입")
+        st.error("🛑 [보안 시스템 강제 개입] Truth Lens가 작동 중입니다.")
         st.subheader("위험한 링크 클릭이 감지되어 시스템이 즉시 차단되었습니다.")
         
         # 즉시 대응 버튼
@@ -123,18 +123,31 @@ if st.session_state.show_barrier:
         
         # 과속 방지턱: 행동 시간을 늘려 이성 회복 유도
         target = "수사 기관은 절대로 앱 설치나 송금을 요구하지 않는다"
-        st.warning(f"💡 **방어 장치**: 아래 문장을 정확히 입력해야 링크 이동 버튼이 활성화됩니다.\n\n**\"{target}\"**")
+        st.warning(f"💡 **방어 장치**: 아래 문장을 정확히 타이핑하십시오. (과속 방지턱 작동 중)")
+        st.markdown(f"**\"{target}\"**")
         
         user_input = st.text_input("직접 타이핑하여 위험을 인지하세요:", key="barrier_input")
         
+        # 문장 입력이 일치했을 때의 로직 수정
         if user_input.strip() == target:
-            st.success("✅ 인지 확인 완료. 사기꾼의 심리적 지배에서 벗어났습니다.")
-            st.link_button("⚠️ 위험 감수하고 경찰청 사이트로 이동", "https://www.polico.go.kr/index.do", type="primary")
+            # 안심시키는 문구 대신 강력한 최종 경고 배치
+            st.error("❗ [최종 경고] 문장을 입력하셨으나, 위험은 사라지지 않았습니다.")
+            st.markdown("""
+            **방금 입력하신 내용을 다시 한번 되새기십시오.** 당신이 지금 누르려는 링크는 당신의 모든 연락처, 사진, 금융 정보를 탈취하기 위한 도구입니다.  
+            **정말로 이 위험을 감수하고 계속 진행하시겠습니까?**
+            """)
             
-            if st.button("차단 완료 및 대화 안전하게 종료"):
-                st.success("✅ 안전하게 개인 자산을 보호했어요! 사기로부터 방어 완료!!")
-                st.info("이것이 바로 Truth Lens만의 특별하고 독보적인 보안 동작입니다.")
-                st.balloons()
-                if st.button("새로운 탐지 시작"):
-                    st.session_state.clear()
-                    st.rerun()
+            col_a, col_b = st.columns(2)
+            with col_a:
+                # 안전 우회 링크
+                st.link_button("⚠️ 위험 무시하고 이동 (권장하지 않음)", "https://www.polico.go.kr/index.do", type="primary")
+            with col_b:
+                if st.button("🚫 차단 완료 및 대화 종료"):
+                    st.success("✅ 안전하게 개인 자산을 보호했어요! 사기로부터 방어 완료!!")
+                    st.info("이것이 바로 Truth Lens만의 특별하고 독보적인 보안 동작입니다.")
+                    st.balloons()
+                    if st.button("새로운 탐지 시작"):
+                        st.session_state.clear()
+                        st.rerun()
+        elif user_input:
+            st.error("⚠️ 문장이 일치하지 않습니다. 당황하지 말고 천천히 다시 입력하며 상황을 직시하세요.")
