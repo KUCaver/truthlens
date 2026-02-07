@@ -1,42 +1,42 @@
 import streamlit as st
-from google import genai  # 이미지 가이드대로 import 방식 변경
+from google import genai  # 최신 SDK 방식
 import os
 
-# --- 1. API 키 설정 (사이드바 입력) ---
+# --- 1. API 키 설정 (Secrets 또는 사이드바) ---
 with st.sidebar:
-    st.title("🔑 Truth Lens 설정")
-    user_key = st.text_input("Gemini API Key 입력", type="password")
+    st.title("🔑 설정")
+    user_key = st.text_input("Gemini API Key", type="password")
 
-# 환경 변수 또는 직접 입력값 사용
-api_key = user_key if user_key else os.getenv("GEMINI_API_KEY")
+# 우선순위: 사용자가 직접 입력한 키 -> 클라우드 Secrets에 저장된 키
+api_key = user_key if user_key else st.secrets.get("GEMINI_API_KEY")
 
 if not api_key:
-    st.warning("사이드바에 API 키를 입력해주세요.")
+    st.warning("API 키가 필요합니다. Secrets에 등록하거나 사이드바에 입력해주세요.")
     st.stop()
 
-# --- 2. 클라이언트 및 모델 설정 ---
-# 이미지 가이드의 '첫 번째 요청하기' 방식을 따릅니다.
+# --- 2. 클라이언트 및 최신 모델 설정 ---
+# 404 에러 방지를 위해 현재 가장 권장되는 2.0 모델을 사용합니다
 client = genai.Client(api_key=api_key)
-# 현재 가장 안정적인 1.5-flash를 기본으로 사용합니다.
-MODEL_ID = "gemini-1.5-flash" 
+MODEL_ID = "gemini-2.0-flash" 
 
 # --- 3. UI 및 시나리오 초기화 ---
 st.set_page_config(page_title="Truth Lens - 실시간 체험", layout="centered")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "서울중앙지검 김민수 수사관입니다. 본인 명의 계좌가 범죄에 이용되었습니다. 본인 맞습니까?", "avatar": "⚖️"}
+        {"role": "assistant", "content": "서울중앙지검 김민수 수사관입니다. 본인 맞습니까?", "avatar": "⚖️"}
     ]
 if "intervene" not in st.session_state:
     st.session_state.intervene = False
 
 st.title("⚖️ 검찰 사칭 대응 훈련")
 
+# 채팅 내역 표시
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=msg.get("avatar")):
         st.write(msg["content"])
 
-# --- 4. 대화 및 개입 로직 ---
+# --- 4. 대화 로직 ---
 if not st.session_state.intervene:
     if prompt := st.chat_input("수사관에게 답변하세요..."):
         st.session_state.messages.append({"role": "user", "content": prompt, "avatar": "😨"})
@@ -44,13 +44,12 @@ if not st.session_state.intervene:
             st.write(prompt)
 
         try:
-            # 이미지 가이드의 실제 호출 방식 적용
+            # 최신 SDK 호출 방식 적용
             response = client.models.generate_content(
                 model=MODEL_ID,
-                contents=f"너는 고압적인 검찰 수사관이야. 사기 앱 설치를 유도하며 대답해: {prompt}"
+                contents=f"너는 사기꾼 수사관이야. 고압적으로 앱 설치(http://bit.ly/truth-lens-app)를 유도해: {prompt}"
             )
             ai_text = response.text
-            
             st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
             with st.chat_message("assistant", avatar="⚖️"):
                 st.write(ai_text)
@@ -60,7 +59,7 @@ if not st.session_state.intervene:
                 st.session_state.intervene = True
                 st.rerun()
         except Exception as e:
-            st.error(f"대화 중 오류 발생: {e}")
+            st.error(f"대화 오류: {e}")
 
 # --- 5. Truth Lens 개입 (현실 자각 로직) ---
 if st.session_state.intervene:
