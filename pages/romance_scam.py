@@ -49,11 +49,15 @@ col_chat, col_status = st.columns([2, 1])
 with col_chat:
     chat_container = st.container(border=True, height=500)
     
-    # 메시지 표시 루프
+    # [수정 포인트] 메시지 표시 루프에서 이미지 타입 대응
     for msg in st.session_state.messages:
         with chat_container.chat_message(msg["role"]):
             if msg.get("type") == "image":
-                st.image(msg["content"], caption="[보안 감지] 도용 의심 이미지", width=250)
+                # 파일 존재 여부 확인 후 이미지 출력
+                if os.path.exists(msg["content"]):
+                    st.image(msg["content"], caption="[보안 감지] 도용 의심 이미지", width=300)
+                else:
+                    st.error(f"🖼️ 이미지를 불러올 수 없습니다. (경로: {msg['content']})")
             else:
                 st.write(msg["content"])
 
@@ -74,20 +78,19 @@ with col_chat:
                 )
                 ai_text = response.text
 
-                # 사진 전송 이벤트
+                # [수정 포인트] 사진 전송 이벤트 발생 시 메시지 리스트에 이미지 타입 추가
                 if st.session_state.chat_count == 3:
-                    # 실제 파일이 없을 경우를 대비한 Fallback 문구
-                    img_path = "pages/scam_photo.jpg"
+                    img_path = "pages/scam_photo.jpg" # 실제 파일 경로
                     if os.path.exists(img_path):
+                        # 텍스트 답변 전에 이미지를 먼저 리스트에 삽입
                         st.session_state.messages.append({"role": "assistant", "content": img_path, "type": "image"})
                     else:
-                        ai_text += "\n\n(방금 제 사진을 보냈는데 확인해 보셨나요?)"
+                        ai_text += "\n\n(시스템: 데이비드가 사진을 보냈으나 파일 경로를 찾을 수 없습니다.)"
 
                 st.session_state.messages.append({"role": "assistant", "content": ai_text, "type": "text"})
                 st.rerun()
                 
             except Exception as e:
-                # API 키 오류(403 등) 발생 시 사용자에게 친절하게 안내
                 error_msg = str(e)
                 if "403" in error_msg:
                     st.error("🚫 입력하신 API 키가 유효하지 않거나 유출되어 차단되었습니다. 새로운 키를 입력해주세요.")
@@ -99,7 +102,6 @@ with col_status:
     st.subheader("🔍 실시간 보안 리포트")
     st.info(random.choice(SECURITY_ALERTS))
     
-    # 링크 전송 감지 시 차단 화면 가동
     last_msg = st.session_state.messages[-1]["content"]
     if "http" in last_msg or "link" in last_msg.lower():
         st.error("🚨 금전 관련 링크가 감지되었습니다!")
@@ -110,7 +112,6 @@ if st.session_state.show_barrier:
     st.divider()
     st.error("🛑 [Truth Lens Alert] 사기 범죄의 최종 단계인 '송금 유도'가 확인되었습니다.")
     
-    # 인지 강화 퀴즈 (Speed Bump)
     st.markdown("### ⚠️ 자산 보호를 위한 인지 확인")
     target_sentence = "모르는 외국인에게 돈을 보내는 것은 100% 사기다"
     st.write(f"다음 문장을 똑같이 입력하여 이성적 판단을 유지하세요: **\"{target_sentence}\"**")
