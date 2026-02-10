@@ -3,9 +3,13 @@ from google import genai
 import os
 import random
 
-# --- 1. API 및 클라이언트 설정 ---
-API_KEY = "AIzaSyDH-4lwnsiRzQkWNd02AAk_xlBf4Slr41k"
-client = genai.Client(api_key=API_KEY)
+# --- 1. API 및 클라이언트 설정 (사이드바 입력으로 수정) ---
+with st.sidebar:
+    st.header("🔑 보안 설정")
+    API_KEY = st.text_input("Gemini API Key를 입력하세요", type="password")
+    st.divider()
+
+# 클라이언트는 키가 입력되었을 때만 생성되도록 아래 로직에서 처리
 MODEL_ID = "gemini-2.0-flash" 
 
 # --- 2. [수정된 프롬프트] 실제 문자 스타일 및 빌드업 전략 ---
@@ -76,20 +80,24 @@ with st.container():
 # --- 8. 대화 입력 및 AI 응답 ---
 if not st.session_state.show_barrier:
     if prompt := st.chat_input("위 보안 분석을 확인 후 답변하세요..."):
-        st.session_state.chat_count += 1
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        
-        try:
-            # 대화 횟수를 프롬프트에 전달하여 단계별 사기 유도
-            response = client.models.generate_content(
-                model=MODEL_ID,
-                contents=f"{FRAUD_INSTRUCTION}\n현재 대화 진행 단계: {st.session_state.chat_count}회\n사용자 입력: {prompt}"
-            )
-            ai_text = response.text
-            st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
-            st.rerun()
-        except Exception as e:
-            st.error(f"대화 오류 발생: {e}")
+        if not API_KEY:
+            st.error("사이드바에 API Key를 입력해야 대화가 가능합니다.")
+        else:
+            st.session_state.chat_count += 1
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            
+            try:
+                # 입력받은 키로 클라이언트 호출
+                client = genai.Client(api_key=API_KEY)
+                response = client.models.generate_content(
+                    model=MODEL_ID,
+                    contents=f"{FRAUD_INSTRUCTION}\n현재 대화 진행 단계: {st.session_state.chat_count}회\n사용자 입력: {prompt}"
+                )
+                ai_text = response.text
+                st.session_state.messages.append({"role": "assistant", "content": ai_text, "avatar": "⚖️"})
+                st.rerun()
+            except Exception as e:
+                st.error(f"대화 오류 발생: {e}")
 
 # --- 9. [STEP 4] 링크 클릭 시 Truth Lens 고유 방어 동작 ---
 last_msg = st.session_state.messages[-1]["content"]
